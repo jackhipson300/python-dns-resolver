@@ -1,10 +1,8 @@
 import struct
-import socket
-import io
 
 from random import randint
 
-from typedefs import DnsHeader, DnsMessage, DnsQuestion, DnsResource, HeaderFlags, MessageType, OpCode, ResponseCode
+from typedefs import DnsHeader, DnsMessage, DnsQuestion, DnsResource, HeaderFlags, MessageType, OpCode, ResourceClass, ResourceType, ResponseCode
 from utils import ByteBuffer
 
 def domain_to_qname(dname: str):
@@ -70,7 +68,7 @@ def parse_header(data) -> DnsHeader:
 # recursively follows the pointers until it reaches an explicit domain label. This function should be
 # modified to detect cycles to prevent a malicious packet from creating an infinite loop using pointers
 # that reference each other
-def parse_label(data: bytes, offset: int, label="", length=0, i=0):
+def parse_label(data: bytes, offset: int, label="", length=0):
   buffer = ByteBuffer(data[offset:])
 
   next_offset = offset + 1
@@ -79,7 +77,7 @@ def parse_label(data: bytes, offset: int, label="", length=0, i=0):
   is_pointer = data[offset] & 0xc0 == 0xc0
   if is_pointer:
     next_offset = buffer.read_int(2) & 0x2fff
-    result = parse_label(data, next_offset, next_label, length, i=i+1) 
+    result = parse_label(data, next_offset, next_label, length) 
     return result[0], length + 2
   else:
     num_chars = buffer.read_int(1)
@@ -90,7 +88,7 @@ def parse_label(data: bytes, offset: int, label="", length=0, i=0):
       part += chr(buffer.read_int(1))
       next_offset += 1
     next_label = label + part + "."
-    return parse_label(data, next_offset, next_label, length + len(part) + 1, i=i+1)
+    return parse_label(data, next_offset, next_label, length + len(part) + 1)
 
 def parse_questions_section(data: bytes, question_count: int, questions_offset: int) -> tuple[list[DnsQuestion], int]:
   questions = []
@@ -121,16 +119,11 @@ def parse_resource_records(data: bytes, resource_count: int, resources_offset: i
     rdata_len = buffer.read_int(2)
     resource_data = buffer.read_int(rdata_len)
 
-    resources.append(DnsResource(label, resource_type, resource_class, ttl, resource_data))
+    resources.append(DnsResource(label, ResourceType(resource_type), ResourceClass(resource_class), ttl, resource_data))
   
   return resources, resources_offset + buffer.tell()
 
-def validate_response_header(header: DnsHeader):
-  if header.type != MessageType.RESPONSE:
-    print("Message type is not response")
-    return False
-
-def parse_response(response):
+def parse_dns_message(response):
   header = parse_header(response)
 
   questions, offset = parse_questions_section(response, header.question_count, 12)
@@ -139,14 +132,14 @@ def parse_response(response):
   additional, offset = parse_resource_records(response, header.additional_count, offset)
 
   return DnsMessage(header, questions, answers, nameservers, additional)
-  
 
-if __name__ == "__main__":
-  query = construct_query("news.ycombinator.com")
+def validate_response_header(header: DnsHeader, expected_id: int):
+  if header.type != MessageType.RESPONSE:
+    return "Message type is not response"
+  if header.id != expected_id:
+    return f"Message id ({header.id}) is not equal to expected id ({expected_id})"
+  return None
 
-  sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  sock.sendto(query, ('8.8.8.8', 53))
-  data, address = sock.recvfrom(1024)
-
-  response = parse_response(data)
-  print(response)
+def validate_response(response: DnsMessage, query: DnsMessage):
+  error = validate_response_header(response.header, query.header.id)
+  return error

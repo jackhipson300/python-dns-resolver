@@ -18,6 +18,14 @@ class ResponseCode(Enum):
   NOT_IMPLEMENTED = 4
   REFUSED = 5
 
+class ResourceType(Enum):
+  IPv4 = 1
+  IPv6 = 28
+  NS = 2
+
+class ResourceClass(Enum):
+  IN = 1
+
 @dataclass
 class HeaderFlags:
   authoritative_answer: bool
@@ -46,8 +54,8 @@ class DnsQuestion:
 @dataclass
 class DnsResource:
   resource_name: str
-  resource_type: int 
-  resource_class: int 
+  resource_type: ResourceType 
+  resource_class: ResourceClass 
   ttl: int 
   resource_data: int
   
