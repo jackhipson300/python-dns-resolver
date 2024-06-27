@@ -1,5 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
+from typing import Any
 
 class MessageType(Enum):
   QUERY = 0
@@ -57,7 +58,7 @@ class DnsResource:
   resource_type: ResourceType 
   resource_class: ResourceClass 
   ttl: int 
-  resource_data: int
+  resource_data: Any
   
 @dataclass 
 class DnsMessage:

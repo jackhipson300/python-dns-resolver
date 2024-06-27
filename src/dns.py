@@ -113,13 +113,19 @@ def parse_resource_records(data: bytes, resource_count: int, resources_offset: i
     label, length = parse_label(data, resources_offset + buffer.tell())
     buffer.seek(buffer.tell() + length)
 
-    resource_type = buffer.read_int(2)
-    resource_class = buffer.read_int(2)
+    resource_type = ResourceType(buffer.read_int(2))
+    resource_class = ResourceClass(buffer.read_int(2))
     ttl = buffer.read_int(4)
     rdata_len = buffer.read_int(2)
-    resource_data = buffer.read_int(rdata_len)
 
-    resources.append(DnsResource(label, ResourceType(resource_type), ResourceClass(resource_class), ttl, resource_data))
+    resource_data = None
+    if resource_type == ResourceType.NS and resource_class == ResourceClass.IN:
+      resource_data, length = parse_label(data, resources_offset + buffer.tell())
+      buffer.seek(buffer.tell() + length)
+    elif resource_type == ResourceType.IPv4 or resource_type == ResourceType.IPv6:
+      resource_data = buffer.read_int(rdata_len)
+
+    resources.append(DnsResource(label, resource_type, resource_class, ttl, resource_data))
   
   return resources, resources_offset + buffer.tell()
 

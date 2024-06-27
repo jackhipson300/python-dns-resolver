@@ -23,7 +23,7 @@ ROOT_SERVERS = [
 
 def resolve(domain: str, server_pool: list[tuple[str, str]]):
   if len(server_pool) == 0:
-    raise Exception("Name server pool is empty")
+    return None
 
   server_ip = server_pool.pop(randint(0, len(server_pool)-1))[1]
   
@@ -32,6 +32,7 @@ def resolve(domain: str, server_pool: list[tuple[str, str]]):
   sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   sock.sendto(raw_query, (server_ip, 53))
   data = sock.recvfrom(1024)[0]
+  sock.close()
 
   query = parse_dns_message(raw_query)
   response = parse_dns_message(data)
@@ -43,9 +44,20 @@ def resolve(domain: str, server_pool: list[tuple[str, str]]):
     return int_to_ipv4_str(response.answers[0].resource_data)
   
   new_server_pool = []
-  for resource in response.additional:
-    if resource.resource_type == ResourceType.IPv4:
-      new_server_pool.append((resource.resource_name, int_to_ipv4_str(resource.resource_data)))
+  if response.header.additional_count > 0:
+    for resource in response.additional:
+      if resource.resource_type == ResourceType.IPv4:
+        new_server_pool.append((resource.resource_name, int_to_ipv4_str(resource.resource_data)))
+  elif response.header.nameserver_count > 0:
+    for resource in response.nameservers:
+      new_domain = resource.resource_data
+      result = resolve(new_domain, ROOT_SERVERS)
+      if result is not None:
+        result = resolve(domain, [(new_domain, result)])
+        if result is not None:
+          return result
+  else:
+    return None
   
   return resolve(domain, new_server_pool)
 
