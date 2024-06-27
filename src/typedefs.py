@@ -23,6 +23,7 @@ class ResourceType(Enum):
   IPv4 = 1
   IPv6 = 28
   NS = 2
+  CNAME = 5
 
 class ResourceClass(Enum):
   IN = 1

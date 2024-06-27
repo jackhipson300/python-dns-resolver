@@ -119,7 +119,7 @@ def parse_resource_records(data: bytes, resource_count: int, resources_offset: i
     rdata_len = buffer.read_int(2)
 
     resource_data = None
-    if resource_type == ResourceType.NS and resource_class == ResourceClass.IN:
+    if (resource_type == ResourceType.NS or resource_type == ResourceType.CNAME) and resource_class == ResourceClass.IN:
       resource_data, length = parse_label(data, resources_offset + buffer.tell())
       buffer.seek(buffer.tell() + length)
     elif resource_type == ResourceType.IPv4 or resource_type == ResourceType.IPv6:
